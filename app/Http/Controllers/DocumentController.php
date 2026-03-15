@@ -60,7 +60,7 @@ class DocumentController extends Controller
         }
 
         $nextId = (int) (DB::table('file')->max('id') ?? 0);
-        $created = 0;
+        $generatedDocumentCount = 0;
 
         $periodDate = $this->extractPeriodDate($report['period']);
         $periodSlug = $this->buildPeriodSlug($report['period'], $periodDate);
@@ -115,11 +115,11 @@ class DocumentController extends Controller
                     $query->where('employee_name', $employeeName);
                 }
 
-                $query->where(function ($q) use ($periodDate, $periodRaw) {
+                $query->where(function ($subQuery) use ($periodDate, $periodRaw) {
                     if ($periodDate) {
-                        $q->whereDate('period_date', $periodDate->toDateString());
+                        $subQuery->whereDate('period_date', $periodDate->toDateString());
                     } else {
-                        $q->whereNull('period_date')->where('period_raw', $periodRaw);
+                        $subQuery->whereNull('period_date')->where('period_raw', $periodRaw);
                     }
                 });
 
@@ -147,10 +147,10 @@ class DocumentController extends Controller
                 }
             }
 
-            $created++;
+            $generatedDocumentCount++;
         }
 
-        return back()->with('status', "Generated {$created} document(s).");
+        return back()->with('status', "Generated {$generatedDocumentCount} document(s).");
     }
 
     public function show(int $id)
@@ -210,8 +210,8 @@ class DocumentController extends Controller
         }
 
         $zip = new ZipArchive();
-        $result = $zip->open($templatePath);
-        if ($result !== true) {
+        $zipOpenResult = $zip->open($templatePath);
+        if ($zipOpenResult !== true) {
             throw new \RuntimeException('Template file template/DTR.docx is not a valid DOCX file.');
         }
 
@@ -230,8 +230,8 @@ class DocumentController extends Controller
         File::copy($templatePath, $tempPath);
 
         $zip = new ZipArchive();
-        $openResult = $zip->open($tempPath);
-        if ($openResult !== true) {
+        $zipOpenResult = $zip->open($tempPath);
+        if ($zipOpenResult !== true) {
             File::delete($tempPath);
             throw new \RuntimeException('Unable to open DOCX template archive.');
         }
@@ -297,19 +297,19 @@ class DocumentController extends Controller
                 $period = $this->valueAfterLabel($row, 'Att. Time');
             }
 
-            $candidate = [];
+            $candidateDayColumns = [];
             foreach ($row as $colIndex => $cell) {
                 if (is_numeric($cell)) {
                     $day = (int) $cell;
                     if ($day >= 1 && $day <= 31) {
-                        $candidate[$colIndex] = $day;
+                        $candidateDayColumns[$colIndex] = $day;
                     }
                 }
             }
 
-            if ($dayRowIndex === null && count($candidate) >= 10 && in_array(1, $candidate, true)) {
+            if ($dayRowIndex === null && count($candidateDayColumns) >= 10 && in_array(1, $candidateDayColumns, true)) {
                 $dayRowIndex = $index;
-                $dayColumns = $candidate;
+                $dayColumns = $candidateDayColumns;
             }
         }
 
@@ -335,23 +335,23 @@ class DocumentController extends Controller
                 $employeeDept = $this->valueAfterLabel($row, 'Dept:');
             }
 
-            $dataRow = null;
-            for ($scan = $rowIndex + 1; $scan < $rowCount; $scan++) {
-                $scanRow = $rows[$scan];
-                if ($this->rowContainsLabel($scanRow, 'ID:')) {
+            $attendanceDataRow = null;
+            for ($scanRowIndex = $rowIndex + 1; $scanRowIndex < $rowCount; $scanRowIndex++) {
+                $scannedRow = $rows[$scanRowIndex];
+                if ($this->rowContainsLabel($scannedRow, 'ID:')) {
                     break;
                 }
-                if ($this->rowHasDataForColumns($scanRow, array_keys($dayColumns))) {
-                    $dataRow = $scanRow;
-                    $rowIndex = $scan;
+                if ($this->rowHasDataForColumns($scannedRow, array_keys($dayColumns))) {
+                    $attendanceDataRow = $scannedRow;
+                    $rowIndex = $scanRowIndex;
                     break;
                 }
             }
 
             $attendance = [];
-            if ($dataRow !== null) {
+            if ($attendanceDataRow !== null) {
                 foreach ($dayColumns as $colIndex => $dayNumber) {
-                    $raw = $dataRow[$colIndex] ?? '';
+                    $raw = $attendanceDataRow[$colIndex] ?? '';
                     $attendance[$dayNumber] = $this->parseAttendanceCell($raw);
                 }
             }
@@ -494,14 +494,14 @@ class DocumentController extends Controller
         }
 
         $times = $matches[0];
-        $deduped = [];
+        $deduplicatedTimes = [];
         foreach ($times as $time) {
-            if (end($deduped) !== $time) {
-                $deduped[] = $time;
+            if (end($deduplicatedTimes) !== $time) {
+                $deduplicatedTimes[] = $time;
             }
         }
 
-        return $deduped;
+        return $deduplicatedTimes;
     }
 
     private function mapTimesToSlots(array $times): array
@@ -537,20 +537,20 @@ class DocumentController extends Controller
             return null;
         }
 
-        $total = 0;
+        $totalMinutes = 0;
         for ($i = 0; $i + 1 < count($times) && $i < 4; $i += 2) {
             $start = $this->timeToMinutes($times[$i]);
             $end = $this->timeToMinutes($times[$i + 1]);
             if ($start === null || $end === null) {
                 continue;
             }
-            $delta = $end - $start;
-            if ($delta > 0) {
-                $total += $delta;
+            $minuteDifference = $end - $start;
+            if ($minuteDifference > 0) {
+                $totalMinutes += $minuteDifference;
             }
         }
 
-        return $total > 0 ? $total : null;
+        return $totalMinutes > 0 ? $totalMinutes : null;
     }
 
     private function timeToMinutes(string $time): ?int
@@ -609,7 +609,7 @@ class DocumentController extends Controller
 
     private function replacePlaceholdersInZip(ZipArchive $zip, array $placeholders): void
     {
-        $xmlParts = [];
+        $xmlPartNames = [];
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $name = $zip->getNameIndex($i);
             if ($name === false) {
@@ -617,18 +617,18 @@ class DocumentController extends Controller
             }
 
             if (preg_match('/^word\/(header|footer)\d+\.xml$/', $name)) {
-                $xmlParts[] = $name;
+                $xmlPartNames[] = $name;
             }
         }
 
-        foreach ($xmlParts as $partName) {
-            $xml = $zip->getFromName($partName);
+        foreach ($xmlPartNames as $xmlPartName) {
+            $xml = $zip->getFromName($xmlPartName);
             if ($xml === false) {
                 continue;
             }
 
             $updated = $this->replacePlaceholdersInWordXml($xml, $placeholders);
-            $zip->addFromString($partName, $updated);
+            $zip->addFromString($xmlPartName, $updated);
         }
     }
 
@@ -658,23 +658,23 @@ class DocumentController extends Controller
 
     private function fillAttendanceTables(string $documentXml, array $attendance): string
     {
-        $dom = new \DOMDocument();
-        $dom->preserveWhiteSpace = true;
-        $dom->formatOutput = false;
-        $dom->loadXML($documentXml);
-        $xp = new \DOMXPath($dom);
-        $xp->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+        $domDocument = new \DOMDocument();
+        $domDocument->preserveWhiteSpace = true;
+        $domDocument->formatOutput = false;
+        $domDocument->loadXML($documentXml);
+        $xpath = new \DOMXPath($domDocument);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
 
-        $tables = $xp->query('//w:tbl');
+        $tables = $xpath->query('//w:tbl');
         foreach ($tables as $table) {
-            $rows = $xp->query('.//w:tr', $table);
+            $rows = $xpath->query('.//w:tr', $table);
             foreach ($rows as $row) {
-                $cells = $xp->query('.//w:tc', $row);
+                $cells = $xpath->query('.//w:tc', $row);
                 if ($cells->length < 3) {
                     continue;
                 }
 
-                $dayText = $this->getCellText($xp, $cells->item(0));
+                $dayText = $this->getCellText($xpath, $cells->item(0));
                 if (!is_numeric($dayText)) {
                     continue;
                 }
@@ -684,34 +684,34 @@ class DocumentController extends Controller
                     continue;
                 }
 
-                $entry = $attendance[$day] ?? [];
-                $slots = $entry['slots'] ?? [];
+                $attendanceEntry = $attendance[$day] ?? [];
+                $slots = $attendanceEntry['slots'] ?? [];
                 $amIn = (string) ($slots['am_in'] ?? '');
                 $amOut = (string) ($slots['am_out'] ?? '');
                 $pmIn = (string) ($slots['pm_in'] ?? '');
                 $pmOut = (string) ($slots['pm_out'] ?? '');
 
                 if ($cells->length >= 5) {
-                    $this->setCellText($dom, $xp, $cells->item(1), $amIn, $row);
-                    $this->setCellText($dom, $xp, $cells->item(2), $amOut, $row);
-                    $this->setCellText($dom, $xp, $cells->item(3), $pmIn, $row);
-                    $this->setCellText($dom, $xp, $cells->item(4), $pmOut, $row);
+                    $this->setCellText($domDocument, $xpath, $cells->item(1), $amIn, $row);
+                    $this->setCellText($domDocument, $xpath, $cells->item(2), $amOut, $row);
+                    $this->setCellText($domDocument, $xpath, $cells->item(3), $pmIn, $row);
+                    $this->setCellText($domDocument, $xpath, $cells->item(4), $pmOut, $row);
                 } else {
                     $arrival = $amIn !== '' ? $amIn : $pmIn;
                     $departure = $pmOut !== '' ? $pmOut : $amOut;
-                    $this->setCellText($dom, $xp, $cells->item(1), $arrival, $row);
-                    $this->setCellText($dom, $xp, $cells->item(2), $departure, $row);
+                    $this->setCellText($domDocument, $xpath, $cells->item(1), $arrival, $row);
+                    $this->setCellText($domDocument, $xpath, $cells->item(2), $departure, $row);
                 }
 
             }
         }
 
-        return $dom->saveXML();
+        return $domDocument->saveXML();
     }
 
-    private function getCellText(\DOMXPath $xp, \DOMElement $cell): string
+    private function getCellText(\DOMXPath $xpath, \DOMElement $cell): string
     {
-        $texts = $xp->query('.//w:t', $cell);
+        $texts = $xpath->query('.//w:t', $cell);
         $value = '';
         foreach ($texts as $text) {
             $value .= $text->nodeValue;
@@ -719,10 +719,10 @@ class DocumentController extends Controller
         return trim($value);
     }
 
-    private function setCellText(\DOMDocument $dom, \DOMXPath $xp, \DOMElement $cell, string $value, \DOMElement $row): void
+    private function setCellText(\DOMDocument $domDocument, \DOMXPath $xpath, \DOMElement $cell, string $value, \DOMElement $row): void
     {
         $value = trim($value);
-        $texts = $xp->query('.//w:t', $cell);
+        $texts = $xpath->query('.//w:t', $cell);
         if ($texts->length > 0) {
             $texts->item(0)->nodeValue = $value;
             if ($value !== '' && preg_match('/\s/', $value)) {
@@ -735,20 +735,20 @@ class DocumentController extends Controller
         }
 
         $ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-        $p = $xp->query('.//w:p', $cell)->item(0);
+        $p = $xpath->query('.//w:p', $cell)->item(0);
         if (!$p) {
-            $p = $dom->createElementNS($ns, 'w:p');
+            $p = $domDocument->createElementNS($ns, 'w:p');
             $cell->appendChild($p);
         }
 
         // Avoid adding extra paragraphs that can stretch the row height.
-        $r = $dom->createElementNS($ns, 'w:r');
-        $referenceRunProps = $this->findReferenceRunProps($xp, $cell, $row);
+        $r = $domDocument->createElementNS($ns, 'w:r');
+        $referenceRunProps = $this->findReferenceRunProps($xpath, $cell, $row);
         if ($referenceRunProps) {
-            $r->appendChild($dom->importNode($referenceRunProps, true));
+            $r->appendChild($domDocument->importNode($referenceRunProps, true));
         }
 
-        $t = $dom->createElementNS($ns, 'w:t', $value);
+        $t = $domDocument->createElementNS($ns, 'w:t', $value);
         if ($value !== '' && preg_match('/\s/', $value)) {
             $t->setAttribute('xml:space', 'preserve');
         }
@@ -756,14 +756,14 @@ class DocumentController extends Controller
         $p->appendChild($r);
     }
 
-    private function findReferenceRunProps(\DOMXPath $xp, \DOMElement $cell, \DOMElement $row): ?\DOMElement
+    private function findReferenceRunProps(\DOMXPath $xpath, \DOMElement $cell, \DOMElement $row): ?\DOMElement
     {
-        $runProps = $xp->query('.//w:rPr', $cell);
+        $runProps = $xpath->query('.//w:rPr', $cell);
         if ($runProps->length > 0) {
             return $runProps->item(0);
         }
 
-        $rowRunProps = $xp->query('.//w:rPr', $row);
+        $rowRunProps = $xpath->query('.//w:rPr', $row);
         if ($rowRunProps->length > 0) {
             return $rowRunProps->item(0);
         }

@@ -34,8 +34,8 @@ class AttendanceController extends Controller
                 return $record;
             })
             ->groupBy(function ($record) {
-                $dept = trim((string) ($record->department ?? ''));
-                return $dept !== '' ? $dept : '__none__';
+                $departmentValue = trim((string) ($record->department ?? ''));
+                return $departmentValue !== '' ? $departmentValue : '__none__';
             })
             ->map(function ($deptRecords, $deptKey) {
                 $departmentValue = $deptKey === '__none__' ? '' : $deptKey;
@@ -51,9 +51,9 @@ class AttendanceController extends Controller
                         return 'name:' . ($employeeName !== '' ? $employeeName : 'unknown');
                     })
                     ->map(function ($employeeRecords) {
-                        $first = $employeeRecords->first();
-                        $employeeId = trim((string) ($first->employee_id ?? ''));
-                        $employeeName = trim((string) ($first->employee_name ?? ''));
+                        $firstRecord = $employeeRecords->first();
+                        $employeeId = trim((string) ($firstRecord->employee_id ?? ''));
+                        $employeeName = trim((string) ($firstRecord->employee_name ?? ''));
 
                         return [
                             'employee_id' => $employeeId,
@@ -104,11 +104,11 @@ class AttendanceController extends Controller
 
         $query = DB::table('attendance_records')->where('admin_id', $adminId);
 
-        $query->where(function ($q) use ($department) {
+        $query->where(function ($subQuery) use ($department) {
             if ($department === '') {
-                $q->whereNull('department')->orWhere('department', '');
+                $subQuery->whereNull('department')->orWhere('department', '');
             } else {
-                $q->where('department', $department);
+                $subQuery->where('department', $department);
             }
         });
 
@@ -129,12 +129,12 @@ class AttendanceController extends Controller
         $zipPath = storage_path('app' . DIRECTORY_SEPARATOR . $zipName);
 
         $zip = new ZipArchive();
-        $openResult = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-        if ($openResult !== true) {
+        $zipOpenResult = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        if ($zipOpenResult !== true) {
             return back()->withErrors(['attendance' => 'Unable to create zip archive.']);
         }
 
-        $usedNames = [];
+        $usedArchiveNames = [];
         foreach ($records as $record) {
             if (empty($record->document_path)) {
                 continue;
@@ -151,16 +151,16 @@ class AttendanceController extends Controller
 
             $periodLabel = $this->formatPeriodLabel($record->period_raw ?? '', $record->period_date ?? null);
             $prefix = Str::slug($periodLabel !== '' ? $periodLabel : 'period');
-            $baseName = $prefix . '_' . basename($fullPath);
-            $archiveName = $baseName;
-            $counter = 1;
-            while (isset($usedNames[$archiveName])) {
-                $archiveName = $prefix . '_' . $counter . '_' . basename($fullPath);
-                $counter++;
+            $baseArchiveName = $prefix . '_' . basename($fullPath);
+            $uniqueArchiveName = $baseArchiveName;
+            $duplicateCounter = 1;
+            while (isset($usedArchiveNames[$uniqueArchiveName])) {
+                $uniqueArchiveName = $prefix . '_' . $duplicateCounter . '_' . basename($fullPath);
+                $duplicateCounter++;
             }
-            $usedNames[$archiveName] = true;
+            $usedArchiveNames[$uniqueArchiveName] = true;
 
-            $zip->addFile($fullPath, $archiveName);
+            $zip->addFile($fullPath, $uniqueArchiveName);
         }
 
         $zip->close();

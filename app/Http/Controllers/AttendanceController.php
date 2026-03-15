@@ -62,7 +62,7 @@ class AttendanceController extends Controller
                                 return [
                                     'id' => $record->id,
                                     'period_label' => $record->period_label,
-                                    'document_url' => $record->document_path ? asset($record->document_path) : null,
+                                    'document_url' => $record->document_path ? route('attendance.document', $record->id) : null,
                                 ];
                             })->values(),
                         ];
@@ -139,7 +139,12 @@ class AttendanceController extends Controller
             if (empty($record->document_path)) {
                 continue;
             }
-            $fullPath = public_path($record->document_path);
+            $path = (string) $record->document_path;
+            if (Str::startsWith($path, 'attendance/')) {
+                $fullPath = storage_path('app' . DIRECTORY_SEPARATOR . $path);
+            } else {
+                $fullPath = public_path($path);
+            }
             if (!File::exists($fullPath)) {
                 continue;
             }
@@ -161,6 +166,32 @@ class AttendanceController extends Controller
         $zip->close();
 
         return response()->download($zipPath, $zipName)->deleteFileAfterSend(true);
+    }
+
+    public function showDocument(int $id)
+    {
+        $adminId = (int) session('admin_id', 0);
+        $record = DB::table('attendance_records')
+            ->where('id', $id)
+            ->where('admin_id', $adminId)
+            ->first();
+
+        if (!$record || empty($record->document_path)) {
+            abort(404);
+        }
+
+        $path = (string) $record->document_path;
+        if (Str::startsWith($path, 'attendance/')) {
+            $fullPath = storage_path('app' . DIRECTORY_SEPARATOR . $path);
+        } else {
+            $fullPath = public_path($path);
+        }
+
+        if (!File::exists($fullPath)) {
+            abort(404);
+        }
+
+        return response()->file($fullPath);
     }
 
     private function formatPeriodLabel(string $periodRaw, ?string $periodDate): string

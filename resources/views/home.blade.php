@@ -307,7 +307,7 @@
               </div>
 
               <button class="btn btn-warning mt-2" type="submit">Generate Docx</button>
-              <div class="upload-note">Attendance documents are saved to `public/documents`.</div>
+              <div class="upload-note">Attendance documents are saved to `storage/app/attendance`.</div>
             </div>
           </div>
         </form>

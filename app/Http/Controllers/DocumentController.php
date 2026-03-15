@@ -54,7 +54,7 @@ class DocumentController extends Controller
         } catch (\RuntimeException $exception) {
             return back()->withErrors(['xls_file' => $exception->getMessage()])->withInput();
         }
-        $documentsDir = public_path('documents');
+        $documentsDir = storage_path('app' . DIRECTORY_SEPARATOR . 'attendance');
         if (!File::exists($documentsDir)) {
             File::makeDirectory($documentsDir, 0755, true);
         }
@@ -67,7 +67,7 @@ class DocumentController extends Controller
 
         foreach ($report['employees'] as $employee) {
             $filename = $this->buildFilename($employee, $periodSlug);
-            $relativePath = 'documents/' . $filename;
+            $relativePath = 'attendance/' . $filename;
             $fullPath = $documentsDir . DIRECTORY_SEPARATOR . $filename;
 
             try {
@@ -160,7 +160,13 @@ class DocumentController extends Controller
             abort(404);
         }
 
-        $fullPath = public_path($record->path);
+        $path = (string) $record->path;
+        if (Str::startsWith($path, 'attendance/')) {
+            $fullPath = storage_path('app' . DIRECTORY_SEPARATOR . $path);
+        } else {
+            $fullPath = public_path($path);
+        }
+
         if (!File::exists($fullPath)) {
             abort(404);
         }
@@ -176,7 +182,12 @@ class DocumentController extends Controller
         }
 
         if (!empty($record->path)) {
-            $fullPath = public_path($record->path);
+            $path = (string) $record->path;
+            if (Str::startsWith($path, 'attendance/')) {
+                $fullPath = storage_path('app' . DIRECTORY_SEPARATOR . $path);
+            } else {
+                $fullPath = public_path($path);
+            }
             if (File::exists($fullPath)) {
                 File::delete($fullPath);
             }

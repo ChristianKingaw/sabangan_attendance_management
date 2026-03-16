@@ -1,164 +1,360 @@
 # Attendance Management System
 
-Attendance Management is a Laravel 12 web app that generates Daily Time Record (DTR) DOCX files from an uploaded XLS attendance report, then organizes those documents by department and employee for quick download. It is designed to run in a local or offline-friendly environment (for example, XAMPP).
+> Generate Daily Time Record (DTR) DOCX files from attendance XLS reports with a Laravel 12 web app.
 
-**Table Of Contents**
-1. Overview
-2. Features
-3. Tech Stack
-4. Project Structure
-5. Requirements
-6. Installation And Setup
-7. Configuration
-8. Database Schema
-9. Usage Guide
-10. XLS Input Format
-11. DOCX Template Requirements
-12. Routes
-13. Storage Layout
-14. Troubleshooting
-15. Security Notes
+![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?style=flat-square&logo=laravel) ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=flat-square&logo=php) ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-**Overview**
-- Upload an XLS file that contains monthly attendance data.
-- Parse attendance by employee and day.
-- Auto-fill a DOCX template and generate one document per employee.
-- Store generated files locally and archive attendance metadata.
-- Browse attendance by department and employee, then download files individually or as a ZIP.
+Attendance Management is a Laravel 12 web app designed to streamline DTR document generation and management. Upload an attendance XLS file, and the system automatically generates personalized DOCX files for each employee, organized by department for easy browsing and downloading. Built for local or offline-friendly environments like XAMPP.
 
-**Features**
-- Admin login with session-based access control.
-- XLS-only import with validation and error feedback.
-- DOCX generation using a template stored in `template/DTR.docx`.
-- Attendance archive view grouped by department and employee.
-- One-click ZIP download of all attendance documents for an employee.
-- Local storage with explicit file paths and database records.
+## 📋 Table of Contents
 
-**Tech Stack**
-- Laravel 12 (PHP 8.2+)
-- MySQL or MariaDB
-- Bootstrap (local assets under `public/vendor/bootstrap`)
-- Vite toolchain for front-end assets
-- PHPSpreadsheet for XLS parsing
-- ZipArchive for DOCX and ZIP creation
+- [Overview](#overview)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Requirements](#requirements)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Configuration](#configuration)
+- [Database Schema](#database-schema)
+- [Usage Guide](#usage-guide)
+- [XLS Input Format](#xls-input-format)
+- [DOCX Template Requirements](#docx-template-requirements)
+- [API Routes](#api-routes)
+- [Storage Layout](#storage-layout)
+- [Troubleshooting](#troubleshooting)
+- [Security Notes](#security-notes)
 
-**Project Structure**
-- `app/Http/Controllers` contains the main app logic.
-- `app/Http/Middleware/AdminAuth.php` protects admin-only routes.
-- `resources/views` contains Blade templates for login, generate, and attendance pages.
-- `template/DTR.docx` is the DOCX template used to generate attendance files.
-- `storage/app/attendance` holds generated DOCX files.
-- `database/migrations` includes attendance-related migrations.
+---
 
-**Requirements**
-- PHP 8.2+
-- Composer
-- Node.js and npm (for Vite builds)
-- MySQL or MariaDB
-- PHP extensions: `zip` (required for DOCX and ZIP generation), `pdo_mysql` (database access), and standard Laravel extensions such as `mbstring`, `openssl`, `xml`, `curl`, `fileinfo`
+## Overview
 
-**Installation And Setup**
-1. Install PHP dependencies: `composer install`
-2. Install front-end dependencies: `npm install`
-3. Create environment file (Windows): `copy .env.example .env`
-4. Generate app key: `php artisan key:generate`
-5. Configure database connection in `.env`.
-6. Run migrations: `php artisan migrate`
-7. Start the app: `php artisan serve`
+- Upload an XLS file containing monthly attendance data
+- Parse attendance records by employee and day
+- Auto-fill a DOCX template to generate one document per employee
+- Store generated files locally with archived attendance metadata
+- Browse attendance records by department and employee, then download files individually or as a ZIP
 
-You can also run the bundled composer scripts:
-- `composer run setup` runs install, environment setup, migrations, and a production asset build.
-- `composer run dev` runs the PHP server, queue listener, and Vite dev server concurrently.
+## Features
 
-**Configuration**
-Set the following in `.env`:
-- `APP_URL` to match your local domain.
-- `DB_*` values to point to your MySQL database.
-- `SESSION_DRIVER`, `CACHE_STORE`, and `QUEUE_CONNECTION` depending on your environment.
+✨ **Core Functionality**
 
-Note: The repository does not include migrations for `sessions`, `cache`, or `jobs` tables. If you keep the `.env` defaults that use database drivers, generate those tables with:
-- `php artisan session:table`
-- `php artisan cache:table`
-- `php artisan queue:table`
-- `php artisan migrate`
+- Session-based admin login with access control
+- XLS-only import with validation and error feedback
+- DOCX generation using a customizable template (`template/DTR.docx`)
+- Attendance archive view grouped by department and employee
+- One-click ZIP download for all attendance documents per employee
+- Local storage with explicit file paths and database records
 
-**Database Schema**
-This app expects three primary tables. Two are legacy and must already exist, and one is created by migration.
+## Tech Stack
 
-Admin table (legacy, required):
-- `admin` with columns `id`, `username`, `password` (bcrypt hash).
+| Technology | Purpose |
+|---|---|
+| **Laravel 12** | PHP web framework |
+| **PHP 8.2+** | Backend runtime |
+| **MySQL / MariaDB** | Database |
+| **Bootstrap** | UI framework (local assets) |
+| **Vite** | Front-end toolchain |
+| **PHPSpreadsheet** | XLS parsing |
+| **ZipArchive** | DOCX & ZIP creation |
 
-File table (legacy, required):
-- `file` with columns `id`, `adminID`, `date` (int in `YYYYMMDD` format), `filename`, `path`.
+## Requirements
 
-Attendance records (created by migration):
-- `attendance_records` with columns `id`, `admin_id`, `employee_id`, `employee_name`, `department`, `period_raw`, `period_date`, `attendance` (JSON), `document_path`, `created_at`, `updated_at`.
+### System
 
-If the `admin` and `file` tables do not exist, create them before running the migrations in this repo.
+- **PHP** 8.2 or higher
+- **Node.js** and npm (for Vite builds)
+- **Composer** (PHP dependency manager)
+- **MySQL** or **MariaDB**
 
-**Usage Guide**
-- Admin login: visit `/login` and enter a valid username and password from the `admin` table.
-- Generate DOCX from XLS: go to `/`, upload an `.xls` file, and the app creates one DOCX per employee in `storage/app/attendance`. The `file` and `attendance_records` tables are updated or inserted.
-- Browse attendance: go to `/attendance`, select a department and employee, then click a period to open the DOCX file.
-- Download ZIP: use the "Download All" button to bundle all DOCX files for the selected employee and download them as a ZIP.
-- Delete a document: call `DELETE /documents/{id}` to remove the file from disk and delete the `file` record.
+### PHP Extensions
 
-**XLS Input Format**
-The XLS parser looks for specific patterns. Ensure your report matches these rules:
-- The report must contain a row with the label `Att. Time`. The value next to it is stored as the period label.
-- The day row is detected when a row contains day numbers (1-31) and includes day 1, with at least 10 day values on the row.
-- Each employee section must include a row with the label `ID:` and `Name:`. `Dept.` or `Dept:` is optional.
-- The attendance data row should appear after the employee header row and should contain time values under the day columns.
+Required extensions:
+- `zip` - for DOCX and ZIP generation
+- `pdo_mysql` - for database access
+- `mbstring`, `openssl`, `xml`, `curl`, `fileinfo` - Laravel standard extensions
 
-Attendance cell parsing rules:
-- Times are detected using the `HH:MM` pattern (for example, `08:00 12:00 13:00 17:00`).
-- The first four times are mapped to AM In, AM Out, PM In, PM Out in that order.
-- Special codes supported: `25` or `LEAVE` -> `Leave`, `26` or `OUT` -> `Out`, `HOLIDAY` or `HOL` -> `Holiday`, `OFF` -> `Off`.
-- If a cell does not match any time or special code, it is stored as a note and passed through as-is.
+---
 
-**DOCX Template Requirements**
-The file `template/DTR.docx` is mandatory and must be a valid DOCX.
+## Quick Start
 
-Placeholders supported in the template:
-- `{employeeName}` or `{name}`
-- `{month}`
-- `{year}`
+### 1. Installation
 
-Table requirements:
-- The template should contain tables where the first column is the day number.
-- If a row has 5 columns, the app fills AM In, AM Out, PM In, PM Out.
-- If a row has 3 columns, the app fills Arrival and Departure.
+```bash
+# Install PHP dependencies
+composer install
 
-If the template is missing, empty, or invalid, the upload will fail with a clear error.
+# Install front-end dependencies
+npm install
 
-**Routes**
-Public:
-- `GET /login` admin login screen
-- `POST /login` authenticate and create admin session
-- `POST /logout` end admin session
+# Create environment file (Windows)
+copy .env.example .env
 
-Protected by `admin.auth` middleware:
-- `GET /` generate page
-- `POST /documents/upload` upload XLS and generate DOCX files
-- `GET /documents/{id}` open a generated DOCX from the `file` table
-- `DELETE /documents/{id}` delete a generated DOCX
-- `GET /attendance` attendance archive view
-- `GET /attendance/documents/{id}` open DOCX by attendance record id
-- `GET /attendance/employee-zip` download ZIP for an employee
+# Generate app key
+php artisan key:generate
+```
 
-**Storage Layout**
-- Uploaded XLS files are processed directly and are not stored by default.
-- Generated DOCX files are stored at `storage/app/attendance`.
-- ZIP files are generated in `storage/app` and deleted after download.
+### 2. Database Setup
 
-**Troubleshooting**
-- "Database table \"file\" does not exist": create the legacy `file` table before uploading.
-- "Template file template/DTR.docx was not found": place your DOCX template in `template/DTR.docx`.
-- "PHP Zip extension is required": enable the `zip` extension in your PHP installation.
-- "No employee records found in the XLS file": verify the XLS format matches the expected labels and day layout.
-- Attendance page is empty: run the migration for `attendance_records` and ensure uploads are completed.
+Update `.env` with your database credentials:
 
-**Security Notes**
-- Authentication is simple and based on a single `admin` table.
-- Passwords must be stored as bcrypt hashes.
-- The app assumes trusted internal usage. If exposed publicly, add rate limiting, strong password policies, and HTTPS.
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=attendance_db
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+Then run migrations:
+
+```bash
+php artisan migrate
+```
+
+### 3. Run the Application
+
+**Option A: Manual Start**
+```bash
+php artisan serve
+```
+
+**Option B: Composer Scripts**
+```bash
+# Full setup with migrations and asset build
+composer run setup
+
+# Development mode (PHP server + Vite dev server)
+composer run dev
+```
+
+---
+
+## Project Structure
+
+```
+├── app/Http/Controllers/          # Main application logic
+├── app/Http/Middleware/           # AdminAuth middleware for protected routes
+├── resources/views/               # Blade templates (login, generate, attendance)
+├── template/                      # DTR.docx template (required)
+├── storage/app/attendance/        # Generated DOCX files
+├── database/migrations/           # Database migrations
+└── public/vendor/bootstrap/       # Local Bootstrap assets
+```
+
+## Configuration
+
+### Environment Variables
+
+Set these in `.env`:
+
+| Variable | Purpose |
+|---|---|
+| `APP_URL` | Local domain URL |
+| `DB_*` | Database connection details |
+| `SESSION_DRIVER` | Session storage (`database`, `file`, `cookie`) |
+| `CACHE_STORE` | Cache backend (`file`, `database`, `array`) |
+| `QUEUE_CONNECTION` | Queue driver (`sync`, `database`, `redis`) |
+
+### Database Tables Setup
+
+If using database drivers for sessions, cache, or jobs:
+
+```bash
+php artisan session:table
+php artisan cache:table
+php artisan queue:table
+php artisan migrate
+```
+
+---
+
+## Database Schema
+
+This app uses **three primary tables**. Two are legacy (must exist before setup), one is created by migration.
+
+### Admin Table (Legacy, Required)
+
+```sql
+CREATE TABLE admin (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(255) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL
+);
+```
+
+### File Table (Legacy, Required)
+
+```sql
+CREATE TABLE file (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  adminID INT NOT NULL,
+  date INT NOT NULL,              -- Format: YYYYMMDD
+  filename VARCHAR(255) NOT NULL,
+  path VARCHAR(255) NOT NULL
+);
+```
+
+### Attendance Records (Created by Migration)
+
+```sql
+CREATE TABLE attendance_records (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  admin_id INT NOT NULL,
+  employee_id VARCHAR(255),
+  employee_name VARCHAR(255) NOT NULL,
+  department VARCHAR(255),
+  period_raw VARCHAR(255),
+  period_date DATE,
+  attendance JSON,                -- Attendance data
+  document_path VARCHAR(255),
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+```
+
+> **Note:** Create the `admin` and `file` tables before running migrations if they don't exist.
+
+---
+
+## Usage Guide
+
+### Admin Login
+Visit `/login` and enter credentials from the `admin` table.
+
+### Generate DOCX from XLS
+1. Go to `/` (home page)
+2. Upload a `.xls` file
+3. The app generates one DOCX per employee in `storage/app/attendance`
+4. Database tables are automatically updated
+
+### Browse Attendance
+1. Go to `/attendance`
+2. Select a department and employee
+3. Click a period to open the DOCX file
+
+### Download All Documents
+Use the **"Download All"** button to bundle all DOCX files for an employee as a ZIP file.
+
+### Delete a Document
+```http
+DELETE /documents/{id}
+```
+This removes the file from disk and deletes the `file` record.
+
+---
+
+## XLS Input Format
+
+The XLS parser looks for specific patterns. Your report must follow these rules:
+
+### Report Structure
+
+- Must contain a row with label **`Att. Time`** (the value becomes the period label)
+- Day row contains day numbers (1-31) with day 1, plus at least 10 day values
+- Each employee section includes:
+  - `ID:` and `Name:` labels
+  - `Dept.` or `Dept:` label (optional)
+- Attendance data row appears after employee header with time values under day columns
+
+### Attendance Cell Parsing
+
+**Time Format:** Detected using `HH:MM` pattern (e.g., `08:00 12:00 13:00 17:00`)
+- First time → AM In
+- Second time → AM Out
+- Third time → PM In
+- Fourth time → PM Out
+
+**Special Codes:**
+| Code | Mapped To |
+|---|---|
+| `25`, `LEAVE` | Leave |
+| `26`, `OUT` | Out |
+| `HOLIDAY`, `HOL` | Holiday |
+| `OFF` | Off |
+
+Other values are stored as notes and passed through as-is.
+
+---
+
+## DOCX Template Requirements
+
+The file **`template/DTR.docx`** is **mandatory** and must be a valid DOCX file.
+
+### Supported Placeholders
+
+Replace these in your template:
+- `{employeeName}` or `{name}` - Employee name
+- `{month}` - Month number
+- `{year}` - Year number
+
+### Table Format
+
+Tables in the template should have:
+- First column = day number
+- **5 columns** → AM In, AM Out, PM In, PM Out
+- **3 columns** → Arrival, Departure
+
+> ⚠️ If the template is missing, empty, or invalid, uploads will fail with a clear error message.
+
+---
+
+## API Routes
+
+### Public Routes
+
+```http
+GET    /login                    # Admin login screen
+POST   /login                    # Authenticate & create session
+POST   /logout                   # End session
+```
+
+### Protected Routes (Requires `admin.auth` Middleware)
+
+```http
+GET    /                         # Generate page
+POST   /documents/upload         # Upload XLS & generate DOCX files
+GET    /documents/{id}           # Open generated DOCX
+DELETE /documents/{id}           # Delete generated DOCX
+GET    /attendance               # Attendance archive view
+GET    /attendance/documents/{id}# Open DOCX by attendance record
+GET    /attendance/employee-zip  # Download employee's ZIP
+```
+
+---
+
+## Storage Layout
+
+| Path | Purpose |
+|---|---|
+| `storage/app/attendance/` | Generated DOCX files (persistent) |
+| `storage/app/` | Temporary ZIP files (deleted after download) |
+| Uploaded files | Processed directly (not stored) |
+
+---
+
+## Troubleshooting
+
+| Error | Solution |
+|---|---|
+| "Database table \"file\" does not exist" | Create the legacy `file` table before uploading |
+| "Template file template/DTR.docx was not found" | Place `DTR.docx` in the `template/` directory |
+| "PHP Zip extension is required" | Enable `zip` extension in `php.ini` |
+| "No employee records found in the XLS file" | Verify XLS format matches expected labels & layout |
+| Attendance page is empty | Run migration & ensure uploads completed |
+
+---
+
+## Security Notes
+
+⚠️ **Important:** This app is designed for **trusted internal usage** in controlled environments.
+
+- Authentication uses a single `admin` table with bcrypt password hashes
+- No built-in rate limiting or password policies
+- Suitable for local/offline environments (e.g., XAMPP)
+
+**For public deployment, add:**
+- Rate limiting on login endpoints
+- Strong password policies
+- HTTPS enforcement
+- Additional access controls

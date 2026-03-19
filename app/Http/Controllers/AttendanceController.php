@@ -11,6 +11,11 @@ use ZipArchive;
 
 class AttendanceController extends Controller
 {
+    public function settings()
+    {
+        return view('settings');
+    }
+
     public function index()
     {
         $adminId = (int) session('admin_id', 0);
@@ -192,6 +197,56 @@ class AttendanceController extends Controller
         }
 
         return response()->file($fullPath);
+    }
+
+    public function destroyAllAttendance(Request $request)
+    {
+        $attendancePaths = collect();
+        $deletedAttendanceRecords = 0;
+        $deletedLegacyRecords = 0;
+
+        if (DB::getSchemaBuilder()->hasTable('attendance_records')) {
+            $paths = DB::table('attendance_records')
+                ->whereNotNull('document_path')
+                ->pluck('document_path');
+            $attendancePaths = $attendancePaths->merge($paths);
+
+            $deletedAttendanceRecords = DB::table('attendance_records')->delete();
+        }
+
+        if (DB::getSchemaBuilder()->hasTable('file')) {
+            $legacyQuery = DB::table('file')
+                ->where('path', 'like', 'attendance/%');
+
+            $legacyPaths = (clone $legacyQuery)
+                ->whereNotNull('path')
+                ->pluck('path');
+            $attendancePaths = $attendancePaths->merge($legacyPaths);
+
+            $deletedLegacyRecords = $legacyQuery->delete();
+        }
+
+        $deletedFiles = 0;
+        foreach ($attendancePaths->filter()->unique() as $path) {
+            $relativePath = trim((string) $path);
+            if ($relativePath === '') {
+                continue;
+            }
+
+            if (Str::startsWith($relativePath, 'attendance/')) {
+                $fullPath = storage_path('app' . DIRECTORY_SEPARATOR . $relativePath);
+            } else {
+                $fullPath = public_path($relativePath);
+            }
+
+            if (File::exists($fullPath)) {
+                File::delete($fullPath);
+                $deletedFiles++;
+            }
+        }
+
+        $totalRecords = $deletedAttendanceRecords + $deletedLegacyRecords;
+        return back()->with('status', "Deleted {$totalRecords} database record(s) and {$deletedFiles} attendance file(s).");
     }
 
     private function formatPeriodLabel(string $periodRaw, ?string $periodDate): string

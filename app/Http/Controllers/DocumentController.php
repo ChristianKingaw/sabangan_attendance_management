@@ -692,15 +692,27 @@ class DocumentController extends Controller
                 $pmOut = (string) ($slots['pm_out'] ?? '');
 
                 if ($cells->length >= 5) {
-                    $this->setCellText($dom, $xp, $cells->item(1), $amIn, $row);
-                    $this->setCellText($dom, $xp, $cells->item(2), $amOut, $row);
-                    $this->setCellText($dom, $xp, $cells->item(3), $pmIn, $row);
-                    $this->setCellText($dom, $xp, $cells->item(4), $pmOut, $row);
+                    if ($amIn !== '') {
+                        $this->setCellText($dom, $xp, $cells->item(1), $amIn, $row);
+                    }
+                    if ($amOut !== '') {
+                        $this->setCellText($dom, $xp, $cells->item(2), $amOut, $row);
+                    }
+                    if ($pmIn !== '') {
+                        $this->setCellText($dom, $xp, $cells->item(3), $pmIn, $row);
+                    }
+                    if ($pmOut !== '') {
+                        $this->setCellText($dom, $xp, $cells->item(4), $pmOut, $row);
+                    }
                 } else {
                     $arrival = $amIn !== '' ? $amIn : $pmIn;
                     $departure = $pmOut !== '' ? $pmOut : $amOut;
-                    $this->setCellText($dom, $xp, $cells->item(1), $arrival, $row);
-                    $this->setCellText($dom, $xp, $cells->item(2), $departure, $row);
+                    if ($arrival !== '') {
+                        $this->setCellText($dom, $xp, $cells->item(1), $arrival, $row);
+                    }
+                    if ($departure !== '') {
+                        $this->setCellText($dom, $xp, $cells->item(2), $departure, $row);
+                    }
                 }
 
             }
@@ -722,6 +734,10 @@ class DocumentController extends Controller
     private function setCellText(\DOMDocument $dom, \DOMXPath $xp, \DOMElement $cell, string $value, \DOMElement $row): void
     {
         $value = trim($value);
+        if ($value === '') {
+            return;
+        }
+
         $texts = $xp->query('.//w:t', $cell);
         if ($texts->length > 0) {
             $texts->item(0)->nodeValue = $value;

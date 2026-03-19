@@ -180,6 +180,7 @@
         <nav class="nav flex-column">
           <a class="nav-link" href="{{ url('/') }}">Generate</a>
           <a class="nav-link active" href="{{ route('attendance.index') }}">Attendance</a>
+          <a class="nav-link" href="{{ route('settings.index') }}">Settings</a>
         </nav>
       </aside>
 

@@ -2,7 +2,7 @@
 
 > Generate Daily Time Record (DTR) DOCX files from attendance XLS reports with a Laravel 12 web app.
 
-![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?style=flat-square&logo=laravel) ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=flat-square&logo=php) ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20?style=flat-square&logo=laravel) ![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=flat-square&logo=php) ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)
 
 Attendance Management is a Laravel 12 web app designed to streamline DTR document generation and management. Upload an attendance XLS file, and the system automatically generates personalized DOCX files for each employee, organized by department for easy browsing and downloading. Built for local or offline-friendly environments like XAMPP. Only designed to fit the template of isabangan's DTR attendance management. ---system requested by sir ERICK. They have a biometrics device but the problem is they don't have a router so what I did was - created a system that fetches the data from the xls file and then autfills the docx template created by sir ERICK LEON. 
 
